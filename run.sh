@@ -1,7 +1,7 @@
 #!/bin/bash
 
 directory_name=${PWD##*/}
-tmp_path="/mnt/c/Windows/temp/$directory_name"
+tmp_path="/mnt/c/Users/benja/rsync/$directory_name"
 
 mkdir -p $tmp_path
 
