@@ -1,6 +1,6 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
-use crate::physics::{Mass, Velocity};
+use crate::physics::{Gravity, Mass, Velocity};
 
 use self::movement::BallMovement;
 
@@ -35,5 +35,6 @@ fn spawn_ball(
         })
         .insert(Ball)
         .insert(Velocity::default())
-        .insert(Mass::default());
+        .insert(Mass::default())
+        .insert(Gravity);
 }
