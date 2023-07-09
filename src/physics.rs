@@ -13,8 +13,7 @@ pub struct Physics;
 
 impl Plugin for Physics {
     fn build(&self, app: &mut App) {
-        app.add_system(update_translation)
-            .add_system(gravity.before(update_translation));
+        app.add_systems(Update, (update_translation, gravity).chain());
     }
 }
 

@@ -11,7 +11,7 @@ pub struct BallMovement;
 
 impl Plugin for BallMovement {
     fn build(&self, app: &mut App) {
-        app.add_system(movement_keys);
+        app.add_systems(Update, movement_keys);
     }
 }
 

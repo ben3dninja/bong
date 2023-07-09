@@ -17,7 +17,8 @@ pub struct BallPlugin;
 
 impl Plugin for BallPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_startup_system(spawn_ball).add_plugin(BallMovement);
+        app.add_systems(Startup, spawn_ball)
+            .add_plugins(BallMovement);
     }
 }
 

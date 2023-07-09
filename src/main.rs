@@ -8,9 +8,8 @@ mod physics;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugin(Physics)
-        .add_plugin(BallPlugin)
-        .add_startup_system(setup)
+        .add_plugins((Physics, BallPlugin))
+        .add_systems(Startup, setup)
         .run();
 }
 
