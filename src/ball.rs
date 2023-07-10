@@ -6,8 +6,8 @@ use self::movement::BallMovement;
 
 mod movement;
 
-const BALL_RADIUS: f32 = 30.;
-const BALL_POSITION: Vec3 = Vec3::new(0., 0., 0.);
+pub const BALL_RADIUS: f32 = 30.;
+pub const BALL_POSITION: Vec3 = Vec3::new(0., 0., 0.);
 const BALL_COLOR: Color = Color::PURPLE;
 
 #[derive(Component)]
