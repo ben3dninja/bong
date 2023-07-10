@@ -27,15 +27,16 @@ fn spawn_ball(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    commands
-        .spawn(MaterialMesh2dBundle {
+    commands.spawn((
+        MaterialMesh2dBundle {
             mesh: meshes.add(shape::Circle::new(BALL_RADIUS).into()).into(),
             material: materials.add(BALL_COLOR.into()),
             transform: Transform::from_translation(BALL_POSITION),
             ..default()
-        })
-        .insert(Ball)
-        .insert(Velocity::default())
-        .insert(Mass::default())
-        .insert(Gravity);
+        },
+        Ball,
+        Velocity::default(),
+        Mass::default(),
+        Gravity,
+    ));
 }
