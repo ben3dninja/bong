@@ -1,17 +1,18 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
-
-use crate::physics::{Gravity, Mass, Velocity};
+use bevy_rapier2d::prelude::*;
 
 use self::movement::BallMovement;
 
 mod movement;
 
-pub const BALL_RADIUS: f32 = 30.;
-pub const BALL_POSITION: Vec3 = Vec3::new(0., 0., 0.);
-const BALL_COLOR: Color = Color::PURPLE;
+/// Ball radius, in pixels
+pub const BALL_RADIUS: f32 = 20.;
+/// Ball starting position, in pixels
+pub const BALL_STARTING_POSITION: Vec3 = Vec3::new(0., 0., 0.);
+const BALL_COLOR: Color = Color::rgb(0.0, 0.38, 0.39);
 
-#[derive(Component)]
-struct Ball;
+#[derive(Component, Default)]
+pub struct Ball;
 
 pub struct BallPlugin;
 
@@ -31,12 +32,17 @@ fn spawn_ball(
         MaterialMesh2dBundle {
             mesh: meshes.add(shape::Circle::new(BALL_RADIUS).into()).into(),
             material: materials.add(BALL_COLOR.into()),
-            transform: Transform::from_translation(BALL_POSITION),
+            transform: Transform::from_translation(BALL_STARTING_POSITION),
             ..default()
         },
-        Ball,
-        Velocity::default(),
-        Mass::default(),
-        Gravity,
+        Ball::default(),
+        RigidBody::Dynamic,
+        LockedAxes::ROTATION_LOCKED,
+        Collider::ball(BALL_RADIUS),
+        ExternalForce::default(),
+        ExternalImpulse::default(),
+        Ccd::enabled(),
+        Sleeping::disabled(),
+        GravityScale(4.5),
     ));
 }
