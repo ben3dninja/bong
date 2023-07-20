@@ -1,9 +1,6 @@
 use ball::BallPlugin;
 use bevy::prelude::*;
-use bevy_rapier2d::{
-    prelude::{NoUserData, RapierPhysicsPlugin},
-    render::RapierDebugRenderPlugin,
-};
+use bevy_rapier2d::prelude::{NoUserData, RapierPhysicsPlugin};
 use scene::GameScenePlugin;
 
 mod ball;
