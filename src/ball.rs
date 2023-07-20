@@ -11,8 +11,10 @@ pub const BALL_RADIUS: f32 = 20.;
 pub const BALL_STARTING_POSITION: Vec3 = Vec3::new(0., 0., 0.);
 const BALL_COLOR: Color = Color::rgb(0.0, 0.38, 0.39);
 
-#[derive(Component, Default)]
-pub struct Ball;
+#[derive(Component)]
+pub struct Ball {
+    material_handle: Handle<ColorMaterial>,
+}
 
 pub struct BallPlugin;
 
@@ -28,14 +30,15 @@ fn spawn_ball(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
+    let material_handle = materials.add(BALL_COLOR.into());
     commands.spawn((
         MaterialMesh2dBundle {
             mesh: meshes.add(shape::Circle::new(BALL_RADIUS).into()).into(),
-            material: materials.add(BALL_COLOR.into()),
+            material: material_handle.clone(),
             transform: Transform::from_translation(BALL_STARTING_POSITION),
             ..default()
         },
-        Ball::default(),
+        Ball { material_handle },
         RigidBody::Dynamic,
         LockedAxes::ROTATION_LOCKED,
         Collider::ball(BALL_RADIUS),
@@ -44,5 +47,6 @@ fn spawn_ball(
         Ccd::enabled(),
         Sleeping::disabled(),
         GravityScale(4.5),
+        AdditionalMassProperties::default(),
     ));
 }

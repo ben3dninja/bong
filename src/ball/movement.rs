@@ -3,8 +3,11 @@ use bevy_rapier2d::prelude::*;
 
 use crate::scene::Wall;
 
+use self::heavier::HeavyPlugin;
+
 use super::Ball;
 
+mod heavier;
 
 /// Force applied to the ball when a key is pressed, in  kilogram pixel per second squared.
 const MOVEMENT_FORCE: f32 = 30.;
@@ -24,15 +27,9 @@ struct MovementKeyPressed {
 
 impl Plugin for BallMovement {
     fn build(&self, app: &mut App) {
-        app.add_event::<MovementKeyPressed>().add_systems(
-            Update,
-            (
-                set_direction,
-                move_ball,
-                jump,
-            )
-                .chain(),
-        );
+        app.add_event::<MovementKeyPressed>()
+            .add_plugins(HeavyPlugin)
+            .add_systems(Update, (set_direction, move_ball, jump).chain());
     }
 }
 
