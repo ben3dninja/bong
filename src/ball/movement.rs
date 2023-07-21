@@ -10,7 +10,7 @@ use self::heavier::HeavyPlugin;
 
 use super::Ball;
 
-mod heavier;
+pub mod heavier;
 
 /// Force applied to the ball when a key is pressed, in  kilogram pixel per second squared.
 const MOVEMENT_FORCE: f32 = 30.;
