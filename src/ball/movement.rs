@@ -1,16 +1,13 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
-use crate::{
-    input::{DirectionVector, PlayerControlled},
-    scene::Wall,
-};
+use crate::{input::DirectionVector, scene::Wall};
 
-use self::heavier::HeavyPlugin;
+use self::heavy::HeavyPlugin;
 
 use super::Ball;
 
-pub mod heavier;
+pub mod heavy;
 
 /// Force applied to the ball when a key is pressed, in  kilogram pixel per second squared.
 const MOVEMENT_FORCE: f32 = 30.;
@@ -18,38 +15,13 @@ const JUMP_SPEED: f32 = 25.;
 /// Y component of the direction vector that triggers jumping
 const JUMP_THRESHOLD: f32 = 0.2;
 
-const KEY_UP: KeyCode = KeyCode::W;
-const KEY_DOWN: KeyCode = KeyCode::S;
-const KEY_LEFT: KeyCode = KeyCode::A;
-const KEY_RIGHT: KeyCode = KeyCode::D;
-
 pub struct BallMovement;
 
 impl Plugin for BallMovement {
     fn build(&self, app: &mut App) {
         app.add_plugins(HeavyPlugin)
-            .add_systems(Update, (set_direction, move_balls, jump).chain());
+            .add_systems(Update, (move_balls, jump).chain());
     }
-}
-
-fn set_direction(
-    k_in: Res<Input<KeyCode>>,
-    mut query: Query<&mut DirectionVector, (With<Ball>, With<PlayerControlled>)>,
-) {
-    let mut direction = Vec2::ZERO;
-    if k_in.pressed(KEY_UP) {
-        direction.y += 1.;
-    }
-    if k_in.pressed(KEY_LEFT) {
-        direction.x -= 1.;
-    }
-    if k_in.pressed(KEY_DOWN) {
-        direction.y -= 1.;
-    }
-    if k_in.pressed(KEY_RIGHT) {
-        direction.x += 1.;
-    }
-    *query.single_mut() = DirectionVector::new_normalize(direction);
 }
 
 fn move_balls(mut query: Query<(&mut ExternalForce, &DirectionVector), With<Ball>>) {
