@@ -3,7 +3,7 @@ use std::f32::consts::SQRT_2;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize)]
 pub enum InputDirection {
     #[default]
     Zero,
@@ -36,7 +36,7 @@ impl Into<DirectionVector> for InputDirection {
     }
 }
 
-#[derive(Default, Serialize, Deserialize, Component)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Component)]
 pub struct DirectionVector(Vec2);
 
 impl std::ops::Deref for DirectionVector {
@@ -61,6 +61,12 @@ impl DirectionVector {
 
     pub fn new_normalize(direction: Vec2) -> Self {
         Self(direction.normalize_or_zero())
+    }
+}
+
+impl Into<Vec2> for DirectionVector {
+    fn into(self) -> Vec2 {
+        self.0
     }
 }
 

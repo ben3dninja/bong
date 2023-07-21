@@ -3,11 +3,8 @@ use std::time::Duration;
 use bevy::{prelude::*, time::Stopwatch};
 use bevy_rapier2d::prelude::*;
 
-use crate::input::PlayerControlled;
-
 use super::super::Ball;
 
-pub const HEAVY_CODE: KeyCode = KeyCode::Space;
 pub const HEAVINESS_FACTOR: f32 = 0.1;
 pub const HEAVINESS_DURATION: Duration = Duration::new(5, 0);
 
@@ -15,12 +12,8 @@ pub struct HeavyPlugin;
 
 impl Plugin for HeavyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (detect_heavier, tick_timers, update_mass).chain());
+        app.add_systems(Update, (tick_timers, update_mass).chain());
     }
-}
-
-fn detect_heavier(k_in: Res<Input<KeyCode>>, mut query: Query<&mut Ball, With<PlayerControlled>>) {
-    query.single_mut().is_heavy = k_in.pressed(HEAVY_CODE);
 }
 
 fn tick_timers(mut query: Query<&mut Ball>, time: Res<Time>) {

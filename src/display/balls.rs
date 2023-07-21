@@ -4,7 +4,7 @@ use bevy::{
 };
 
 use crate::ball::{
-    movement::heavier::HEAVINESS_DURATION, Ball, BALL_RADIUS, BALL_STARTING_TRANSFORM,
+    movement::heavy::HEAVINESS_DURATION, Ball, BALL_RADIUS, BALL_STARTING_TRANSFORM,
 };
 
 const BALL_COLOR: Color = Color::rgb(0.0, 0.38, 0.39);
