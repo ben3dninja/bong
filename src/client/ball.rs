@@ -1,17 +1,11 @@
-use std::collections::HashMap;
-
 use bevy::{
     prelude::*,
     sprite::{MaterialMesh2dBundle, Mesh2dHandle},
 };
 
-use crate::{GameState, Heavy, BALL_RADIUS, HEAVINESS_DURATION};
-
-use super::ClientLobby;
+use crate::{GameState, Heavy, Lobby, BALL_RADIUS, HEAVINESS_DURATION};
 
 const BALL_COLOR: Color = Color::rgb(0.0, 0.38, 0.39);
-
-const DEFAULT_STARTING_POSITION: Vec3 = Vec3::ZERO;
 
 pub(super) struct BallsPlugin;
 
@@ -37,12 +31,11 @@ pub(super) struct Ball {
 
 pub(super) fn spawn_balls(
     mut commands: Commands,
-    mut lobby: ResMut<ClientLobby>,
+    mut lobby: ResMut<Lobby>,
     mesh_handle: Res<BallMesh>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let mut new_map = HashMap::new();
-    for player_id in lobby.players.keys() {
+    for data in lobby.players.values_mut() {
         let material = materials.add(BALL_COLOR.into());
         let original_material = materials.add(BALL_COLOR.into());
         let entity = commands
@@ -55,14 +48,13 @@ pub(super) fn spawn_balls(
                 MaterialMesh2dBundle {
                     mesh: mesh_handle.0.clone(),
                     material,
-                    transform: Transform::from_translation(DEFAULT_STARTING_POSITION),
+                    transform: Transform::from_translation(data.spawning_location),
                     ..default()
                 },
             ))
             .id();
-        new_map.insert(*player_id, Some(entity));
+        data.entity = Some(entity);
     }
-    lobby.players = new_map;
 }
 
 pub(super) fn despawn_balls(mut commands: Commands, balls: Query<Entity, With<Ball>>) {
