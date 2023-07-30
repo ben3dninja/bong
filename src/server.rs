@@ -17,8 +17,8 @@ use bevy_renet::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    client::channel::ClientChannel, connection_config, DirectionVector, GameState, Heavy,
-    NetworkedEntities, PlayerCommand, PlayerInput,
+    client::channel::ClientChannel, connection_config, ApplicationSide, DirectionVector, GameState,
+    Heavy, Lobby, NetworkedEntities, PlayerCommand, PlayerData, PlayerInput,
 };
 
 use self::{
@@ -42,7 +42,8 @@ impl Plugin for ServerPlugin {
     fn build(&self, app: &mut App) {
         let (server, transport) = self.new_renet_server();
         app.add_state::<GameState>()
-            .insert_resource(ServerLobby::default())
+            .insert_resource(Lobby::default())
+            .insert_resource(ApplicationSide::Server)
             .insert_resource(server)
             .insert_resource(transport)
             .add_plugins(DefaultPlugins)
@@ -70,15 +71,10 @@ impl Plugin for ServerPlugin {
     }
 }
 
-#[derive(Default, Resource)]
-struct ServerLobby {
-    players: HashMap<u64, Option<Entity>>,
-}
-
 #[derive(Debug, Serialize, Deserialize, Component)]
 pub enum ServerMessage {
     EnterLobby,
-    EnterGame { player_ids: Vec<u64> },
+    EnterGame { players: HashMap<u64, PlayerData> },
     Stop,
     PlayerLeavedInGame { player_id: u64 },
     PlayerHeavinessChange { player_id: u64, heaviness: bool },
@@ -110,13 +106,13 @@ fn receive_server_events(
     mut server_events: EventReader<ServerEvent>,
     mut server: ResMut<RenetServer>,
     state: ResMut<State<GameState>>,
-    mut players: ResMut<ServerLobby>,
+    mut players: ResMut<Lobby>,
 ) {
     for event in server_events.iter() {
         match event {
             ServerEvent::ClientConnected { client_id } => {
                 println!("Player joined with client id {}", client_id);
-                players.players.insert(*client_id, None);
+                players.players.insert(*client_id, PlayerData::default());
             }
             ServerEvent::ClientDisconnected { client_id, reason } => {
                 println!(
@@ -134,7 +130,7 @@ fn receive_server_events(
                         );
                         // TODO deal with these unwraps
                         commands
-                            .get_entity(players.players.get(client_id).unwrap().unwrap())
+                            .get_entity(players.players.get(client_id).unwrap().entity.unwrap())
                             .unwrap()
                             .despawn_recursive();
                     }
@@ -148,7 +144,7 @@ fn receive_server_events(
 
 fn receive_client_messages_in_game(
     mut server: ResMut<RenetServer>,
-    lobby: Res<ServerLobby>,
+    lobby: Res<Lobby>,
     mut query: Query<(&mut DirectionVector, &mut Heavy), With<Ball>>,
 ) {
     for client_id in server.clients_id() {
@@ -156,7 +152,7 @@ fn receive_client_messages_in_game(
             // TODO deal with these unwraps
             let input: PlayerInput = bincode::deserialize(&message).unwrap();
             let (mut direction, _) = query
-                .get_mut(lobby.players.get(&client_id).unwrap().unwrap())
+                .get_mut(lobby.players.get(&client_id).unwrap().entity.unwrap())
                 .unwrap();
             *direction = DirectionVector::from(input);
         }
@@ -166,7 +162,7 @@ fn receive_client_messages_in_game(
             match player_command {
                 PlayerCommand::Heavy(heaviness) => {
                     let (_, mut heavy) = query
-                        .get_mut(lobby.players.get(&client_id).unwrap().unwrap())
+                        .get_mut(lobby.players.get(&client_id).unwrap().entity.unwrap())
                         .unwrap();
                     heavy.heaviness = heaviness;
                     let message = bincode::serialize(&ServerMessage::PlayerHeavinessChange {
@@ -184,12 +180,12 @@ fn receive_client_messages_in_game(
 fn send_clients_positions_in_game(
     mut server: ResMut<RenetServer>,
     query: Query<&Transform, With<Ball>>,
-    lobby: Res<ServerLobby>,
+    lobby: Res<Lobby>,
 ) {
     let mut networked_entities = NetworkedEntities::default();
-    for (id, entity) in lobby.players.iter() {
+    for (id, data) in lobby.players.iter() {
         // TODO unwraps
-        let entity = entity.unwrap();
+        let entity = data.entity.unwrap();
         let translation = query.get(entity).unwrap().translation;
         networked_entities
             .translations
@@ -209,9 +205,9 @@ fn start_lobby(mut server: ResMut<RenetServer>) {
     println!("Starting lobby");
 }
 
-fn start_game(mut server: ResMut<RenetServer>, lobby: Res<ServerLobby>) {
+fn start_game(mut server: ResMut<RenetServer>, lobby: Res<Lobby>) {
     let message = bincode::serialize(&ServerMessage::EnterGame {
-        player_ids: lobby.players.clone().into_keys().collect(),
+        players: lobby.players.clone(),
     })
     .unwrap();
     server.broadcast_message(ServerChannel::ServerMessages, message);
@@ -226,7 +222,7 @@ fn stop(mut exit: EventWriter<AppExit>, mut server: ResMut<RenetServer>) {
 }
 
 fn check_player_count(
-    lobby: Res<ServerLobby>,
+    lobby: Res<Lobby>,
     state: Res<State<GameState>>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {

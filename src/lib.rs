@@ -27,6 +27,23 @@ pub enum GameState {
     InGame,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, Resource)]
+pub struct Lobby {
+    players: HashMap<u64, PlayerData>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct PlayerData {
+    spawning_location: Vec3,
+    entity: Option<Entity>,
+}
+
+#[derive(Debug, Resource)]
+pub enum ApplicationSide {
+    Server,
+    Client,
+}
+
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PlayerInput {
     direction: Vec2,
