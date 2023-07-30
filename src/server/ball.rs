@@ -1,13 +1,11 @@
-use std::collections::HashMap;
-
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
-use crate::{DirectionVector, GameState, Heavy, BALL_RADIUS};
+use crate::{DirectionVector, GameState, Heavy, Lobby, BALL_RADIUS};
 
 use self::heavy::HeavyPlugin;
 
-use super::{scene::Wall, ServerLobby};
+use super::scene::Wall;
 
 /// Force applied to the ball when a key is pressed, in  kilogram pixel per second squared.
 const MOVEMENT_FORCE: f32 = 30.;
@@ -20,38 +18,25 @@ mod heavy;
 #[derive(Component)]
 pub(super) struct Ball;
 
-#[derive(Resource)]
-pub(super) struct BallSpawningData {
-    locations: Vec<Vec3>,
-}
-
 pub(super) struct BallsPlugin;
 
 impl Plugin for BallsPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(BallSpawningData {
-            locations: create_spawning_locations(),
-        })
-        .add_plugins(HeavyPlugin)
-        .add_systems(OnEnter(GameState::InGame), spawn_balls)
-        .add_systems(
-            Update,
-            (move_balls, jump)
-                .after(super::receive_client_messages_in_game)
-                .run_if(in_state(GameState::InGame)),
-        )
-        .add_systems(OnExit(GameState::InGame), despawn_balls);
+        app.add_plugins(HeavyPlugin)
+            .add_systems(OnEnter(GameState::InGame), spawn_balls)
+            .add_systems(
+                Update,
+                (move_balls, jump)
+                    .after(super::receive_client_messages_in_game)
+                    .run_if(in_state(GameState::InGame)),
+            )
+            .add_systems(OnExit(GameState::InGame), despawn_balls);
     }
 }
 
-pub(super) fn spawn_balls(
-    mut commands: Commands,
-    mut lobby: ResMut<ServerLobby>,
-    spawning_data: Res<BallSpawningData>,
-) {
-    let mut locations = spawning_data.locations.clone().into_iter();
-    let mut new_map = HashMap::new();
-    for player_id in lobby.players.keys() {
+pub(super) fn spawn_balls(mut commands: Commands, mut lobby: ResMut<Lobby>) {
+    let mut locations = create_spawning_locations().into_iter();
+    for data in lobby.players.values_mut() {
         let entity = commands
             .spawn((
                 Ball,
@@ -75,9 +60,8 @@ pub(super) fn spawn_balls(
                 },
             ))
             .id();
-        new_map.insert(*player_id, Some(entity));
+        data.entity = Some(entity);
     }
-    lobby.players = new_map;
 }
 
 pub(super) fn despawn_balls(mut commands: Commands, balls: Query<Entity, With<Ball>>) {

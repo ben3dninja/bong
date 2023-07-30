@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     net::{SocketAddr, UdpSocket},
     time::SystemTime,
 };
@@ -17,7 +16,7 @@ use bevy_renet::{
 use crate::{
     connection_config,
     server::{channel::ServerChannel, ServerMessage},
-    GameState, Heavy, NetworkedEntities, PlayerCommand, PlayerInput,
+    ApplicationSide, GameState, Heavy, Lobby, NetworkedEntities, PlayerCommand, PlayerInput,
 };
 
 use self::{
@@ -41,11 +40,6 @@ const KEY_HEAVY: KeyCode = KeyCode::Space;
 
 const MOVEMENT_KEYS: [KeyCode; 4] = [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT];
 
-#[derive(Default, Resource)]
-struct ClientLobby {
-    players: HashMap<u64, Option<Entity>>,
-}
-
 pub struct ClientPlugin {
     pub server_addr: SocketAddr,
     pub socket_addr: SocketAddr,
@@ -56,7 +50,8 @@ impl Plugin for ClientPlugin {
     fn build(&self, app: &mut App) {
         let (client, transport) = self.new_renet_client();
         app.add_state::<GameState>()
-            .insert_resource(ClientLobby::default())
+            .insert_resource(Lobby::default())
+            .insert_resource(ApplicationSide::Client)
             .insert_resource(client)
             .insert_resource(transport)
             .add_plugins(DefaultPlugins)
@@ -105,7 +100,7 @@ fn receive_server_message(
     mut commands: Commands,
     mut client: ResMut<RenetClient>,
     mut next_state: ResMut<NextState<GameState>>,
-    mut lobby: ResMut<ClientLobby>,
+    mut lobby: ResMut<Lobby>,
     mut exit: EventWriter<AppExit>,
     mut query: Query<&mut Heavy, With<Ball>>,
 ) {
@@ -114,23 +109,22 @@ fn receive_server_message(
         let message: ServerMessage = bincode::deserialize(&message).unwrap();
         match message {
             ServerMessage::EnterLobby => next_state.set(GameState::Lobby),
-            ServerMessage::EnterGame { player_ids } => {
-                for id in player_ids {
-                    lobby.players.insert(id, None);
-                }
+            ServerMessage::EnterGame { players } => {
+                lobby.players = players;
+                // entities are server entities but since they are immediately written away when balls are spawned this is not a problem
                 next_state.set(GameState::InGame);
             }
             ServerMessage::Stop => exit.send(AppExit),
             ServerMessage::PlayerLeavedInGame { player_id } => {
                 // TODO unwraps
-                let entity = lobby.players.get(&player_id).unwrap().unwrap();
+                let entity = lobby.players.get(&player_id).unwrap().entity.unwrap();
                 commands.get_entity(entity).unwrap().despawn_recursive()
             }
             ServerMessage::PlayerHeavinessChange {
                 player_id,
                 heaviness,
             } => {
-                let entity = lobby.players.get(&player_id).unwrap().unwrap();
+                let entity = lobby.players.get(&player_id).unwrap().entity.unwrap();
                 query.get_mut(entity).unwrap().heaviness = heaviness;
             }
         }
@@ -138,7 +132,7 @@ fn receive_server_message(
 }
 
 fn receive_entities_in_game(
-    lobby: Res<ClientLobby>,
+    lobby: Res<Lobby>,
     mut commands: Commands,
     mut client: ResMut<RenetClient>,
 ) {
@@ -146,7 +140,7 @@ fn receive_entities_in_game(
         // TODO unwraps
         let networked_entities: NetworkedEntities = bincode::deserialize(&message).unwrap();
         for (id, (x, y)) in networked_entities.translations {
-            let entity = lobby.players.get(&id).unwrap().unwrap();
+            let entity = lobby.players.get(&id).unwrap().entity.unwrap();
             commands
                 .get_entity(entity)
                 .unwrap()
