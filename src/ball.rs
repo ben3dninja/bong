@@ -1,11 +1,11 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
-use crate::{DirectionVector, GameState, Heavy, Lobby, BALL_RADIUS};
+use crate::{ApplicationSide, DirectionVector, GameState, Heavy, Lobby, BALL_RADIUS};
 
 use self::heavy::HeavyPlugin;
 
-use super::scene::Wall;
+use crate::scene::Wall;
 
 /// Force applied to the ball when a key is pressed, in  kilogram pixel per second squared.
 const MOVEMENT_FORCE: f32 = 30.;
@@ -18,6 +18,11 @@ mod heavy;
 #[derive(Component)]
 pub(super) struct Ball;
 
+#[derive(Resource)]
+pub(super) struct SpawningLocations {
+    locations: Vec<Vec3>,
+}
+
 pub(super) struct BallsPlugin;
 
 impl Plugin for BallsPlugin {
@@ -27,15 +32,20 @@ impl Plugin for BallsPlugin {
             .add_systems(
                 Update,
                 (move_balls, jump)
-                    .after(super::receive_client_messages_in_game)
+                    .after(receive_player_inputs)
                     .run_if(in_state(GameState::InGame)),
             )
             .add_systems(OnExit(GameState::InGame), despawn_balls);
     }
 }
 
-pub(super) fn spawn_balls(mut commands: Commands, mut lobby: ResMut<Lobby>) {
-    let mut locations = create_spawning_locations().into_iter();
+pub(super) fn spawn_balls(
+    mut commands: Commands,
+    mut lobby: ResMut<Lobby>,
+    spawning_locations: Res<SpawningLocations>,
+    side: Res<ApplicationSide>,
+) {
+    let mut locations = spawning_locations.locations.into_iter();
     for data in lobby.players.values_mut() {
         let entity = commands
             .spawn((
@@ -50,7 +60,6 @@ pub(super) fn spawn_balls(mut commands: Commands, mut lobby: ResMut<Lobby>) {
                 Collider::ball(BALL_RADIUS),
                 ExternalForce::default(),
                 ExternalImpulse::default(),
-                Ccd::enabled(),
                 GravityScale(4.5),
                 AdditionalMassProperties::default(),
                 Sleeping::disabled(),
