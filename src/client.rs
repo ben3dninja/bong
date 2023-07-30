@@ -14,21 +14,17 @@ use bevy_renet::{
 };
 
 use crate::{
+    ball::{Ball, BallsPlugin},
     connection_config,
+    display::DisplayPlugin,
+    scene::GameScenePlugin,
     server::{channel::ServerChannel, ServerMessage},
     ApplicationSide, GameState, Heavy, Lobby, NetworkedEntities, PlayerCommand, PlayerInput,
 };
 
-use self::{
-    ball::{Ball, BallsPlugin},
-    channel::ClientChannel,
-    scene::GameScenePlugin,
-};
+use self::channel::ClientChannel;
 
 pub mod channel;
-
-mod ball;
-mod scene;
 
 pub const BACKGROUND_COLOR: Color = Color::rgb(0.17, 0.24, 0.31);
 
@@ -56,7 +52,7 @@ impl Plugin for ClientPlugin {
             .insert_resource(transport)
             .add_plugins(DefaultPlugins)
             .add_plugins((RenetClientPlugin, NetcodeClientPlugin))
-            .add_plugins((BallsPlugin, GameScenePlugin))
+            .add_plugins((BallsPlugin, GameScenePlugin, DisplayPlugin))
             .add_systems(Startup, setup_camera)
             .add_systems(
                 Update,

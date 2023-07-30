@@ -1,52 +1,37 @@
-use bevy::{
-    prelude::*,
-    sprite::{MaterialMesh2dBundle, Mesh2dHandle},
-};
+use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
-use crate::{GameState, Heavy, Lobby, BALL_RADIUS, HEAVINESS_DURATION};
+use crate::{Heavy, Lobby, BALL_RADIUS, HEAVINESS_DURATION};
 
 const BALL_COLOR: Color = Color::rgb(0.0, 0.38, 0.39);
 
-pub(super) struct BallsPlugin;
-
-impl Plugin for BallsPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, create_ball_mesh)
-            .add_systems(OnEnter(GameState::InGame), spawn_balls)
-            .add_systems(
-                Update,
-                update_ball_colors
-                    .after(super::receive_entities_in_game)
-                    .run_if(in_state(GameState::InGame)),
-            )
-            .add_systems(OnExit(GameState::InGame), despawn_balls);
-    }
-}
-
 #[derive(Component)]
-pub(super) struct Ball {
+pub(super) struct BallDisplay {
     material: Handle<ColorMaterial>,
     original_material: Handle<ColorMaterial>,
 }
 
-pub(super) fn spawn_balls(
+pub(super) fn display_balls(
     mut commands: Commands,
     mut lobby: ResMut<Lobby>,
-    mesh_handle: Res<BallMesh>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for data in lobby.players.values_mut() {
         let material = materials.add(BALL_COLOR.into());
+        let mesh = meshes.add(shape::Circle::new(BALL_RADIUS).into()).into();
         let original_material = materials.add(BALL_COLOR.into());
+        // TODO unwraps
         let entity = commands
-            .spawn((
-                Ball {
+            .get_entity(data.entity.unwrap())
+            .unwrap()
+            .insert((
+                BallDisplay {
                     material: material.clone(),
                     original_material,
                 },
                 Heavy::default(),
                 MaterialMesh2dBundle {
-                    mesh: mesh_handle.0.clone(),
+                    mesh,
                     material,
                     transform: Transform::from_translation(data.spawning_location),
                     ..default()
@@ -57,23 +42,8 @@ pub(super) fn spawn_balls(
     }
 }
 
-pub(super) fn despawn_balls(mut commands: Commands, balls: Query<Entity, With<Ball>>) {
-    for ball in balls.iter() {
-        commands.get_entity(ball).unwrap().despawn_recursive();
-    }
-}
-
-#[derive(Resource)]
-pub(super) struct BallMesh(Mesh2dHandle);
-
-pub(super) fn create_ball_mesh(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
-    commands.insert_resource(BallMesh(
-        meshes.add(shape::Circle::new(BALL_RADIUS).into()).into(),
-    ));
-}
-
 pub(super) fn update_ball_colors(
-    query: Query<(&Ball, &Heavy)>,
+    query: Query<(&BallDisplay, &Heavy)>,
     mut assets: ResMut<Assets<ColorMaterial>>,
 ) {
     for (ball, heavy) in query.iter() {
