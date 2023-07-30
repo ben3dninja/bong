@@ -5,6 +5,10 @@ use bevy::{prelude::*, time::Stopwatch};
 pub mod client;
 pub mod server;
 
+mod ball;
+mod display;
+mod scene;
+
 use bevy_renet::renet::ConnectionConfig;
 use client::channel::ClientChannel;
 pub use client::ClientPlugin;
@@ -38,7 +42,7 @@ pub struct PlayerData {
     entity: Option<Entity>,
 }
 
-#[derive(Debug, Resource)]
+#[derive(Debug, Resource, Eq, PartialEq)]
 pub enum ApplicationSide {
     Server,
     Client,

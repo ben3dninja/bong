@@ -17,19 +17,17 @@ use bevy_renet::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    client::channel::ClientChannel, connection_config, ApplicationSide, DirectionVector, GameState,
-    Heavy, Lobby, NetworkedEntities, PlayerCommand, PlayerData, PlayerInput,
-};
-
-use self::{
     ball::{Ball, BallsPlugin},
-    channel::ServerChannel,
+    client::channel::ClientChannel,
+    connection_config,
     scene::GameScenePlugin,
+    ApplicationSide, DirectionVector, GameState, Heavy, Lobby, NetworkedEntities, PlayerCommand,
+    PlayerData, PlayerInput,
 };
 
-mod ball;
+use self::channel::ServerChannel;
+
 pub mod channel;
-mod scene;
 
 pub const PPM: f32 = 100.;
 
