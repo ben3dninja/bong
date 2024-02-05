@@ -4,8 +4,9 @@ use std::{
     time::SystemTime,
 };
 
-use bevy::{app::AppExit, prelude::*};
-use bevy_rapier2d::prelude::{NoUserData, RapierPhysicsPlugin};
+use bevy::{app::AppExit, diagnostic::LogDiagnosticsPlugin, prelude::*};
+use bevy_egui::{EguiContexts, EguiPlugin};
+use bevy_rapier2d::prelude::{NoUserData, RapierConfiguration, RapierPhysicsPlugin, TimestepMode};
 use bevy_renet::{
     renet::{
         transport::{NetcodeServerTransport, ServerAuthentication, ServerConfig},
@@ -14,22 +15,19 @@ use bevy_renet::{
     transport::NetcodeServerPlugin,
     RenetServerPlugin,
 };
+use renet_visualizer::RenetServerVisualizer;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ball::{Ball, BallsPlugin},
-    client::channel::ClientChannel,
-    connection_config,
-    scene::GameScenePlugin,
-    ApplicationSide, DirectionVector, GameState, Heavy, Lobby, NetworkedEntities, PlayerCommand,
-    PlayerData, PlayerInput,
+    ball::BallsPlugin, connection_config, display::DisplayPlugin, scene::GameScenePlugin,
+    ApplicationSide, GameState, Lobby, PlayerData, Processing, Receiving, Sending, FIXED_DT,
+    PHYSICS_DT, PPM, SUBSTEPS,
 };
 
-use self::channel::ServerChannel;
+use self::{channel::ServerChannel, communication::ServerCommunicationPlugin};
 
 pub mod channel;
-
-pub const PPM: f32 = 100.;
+pub mod communication;
 
 pub struct ServerPlugin {
     pub public_addr: SocketAddr,
@@ -44,27 +42,41 @@ impl Plugin for ServerPlugin {
             .insert_resource(ApplicationSide::Server)
             .insert_resource(server)
             .insert_resource(transport)
+            .insert_resource(RapierConfiguration {
+                timestep_mode: TimestepMode::Fixed {
+                    dt: PHYSICS_DT,
+                    substeps: SUBSTEPS,
+                },
+                ..default()
+            })
             .add_plugins(DefaultPlugins)
+            .insert_resource(FixedTime::new_from_secs(FIXED_DT))
             .add_plugins((
                 RenetServerPlugin,
                 NetcodeServerPlugin,
                 RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(PPM),
             ))
+            .add_plugins((
+                // FrameTimeDiagnosticsPlugin,
+                LogDiagnosticsPlugin::default(),
+                EguiPlugin,
+            ))
+            .insert_resource(RenetServerVisualizer::<200>::default())
             .add_plugins((BallsPlugin, GameScenePlugin))
-            .add_systems(OnEnter(GameState::InGame), start_game)
-            .add_systems(OnEnter(GameState::Lobby), start_lobby)
-            .add_systems(OnExit(GameState::InGame), stop)
-            .add_systems(
-                Update,
-                (
-                    receive_server_events,
-                    receive_client_messages_in_game.run_if(in_state(GameState::InGame)),
-                    check_player_count,
-                ),
+            .add_plugins(DisplayPlugin)
+            .add_plugins(ServerCommunicationPlugin)
+            .configure_sets(FixedUpdate, (Receiving, Processing, Sending).chain())
+            .configure_sets(
+                OnEnter(GameState::InGame),
+                (Receiving, Processing, Sending).chain(),
             )
+            .add_systems(OnEnter(GameState::InGame), start_game.in_set(Sending))
+            .add_systems(OnEnter(GameState::Lobby), start_lobby.in_set(Sending))
+            .add_systems(OnExit(GameState::InGame), stop.in_set(Sending))
+            .add_systems(Update, update_visualizer_system)
             .add_systems(
-                PostUpdate,
-                send_clients_positions_in_game.run_if(in_state(GameState::InGame)),
+                FixedUpdate,
+                (receive_server_events.in_set(Receiving), check_player_count),
             );
     }
 }
@@ -75,7 +87,6 @@ pub enum ServerMessage {
     EnterGame { players: HashMap<u64, PlayerData> },
     Stop,
     PlayerLeavedInGame { player_id: u64 },
-    PlayerHeavinessChange { player_id: u64, heaviness: bool },
 }
 
 impl ServerPlugin {
@@ -105,18 +116,21 @@ fn receive_server_events(
     mut server: ResMut<RenetServer>,
     state: ResMut<State<GameState>>,
     mut players: ResMut<Lobby>,
+    mut visualizer: ResMut<RenetServerVisualizer<200>>,
 ) {
     for event in server_events.iter() {
         match event {
             ServerEvent::ClientConnected { client_id } => {
                 println!("Player joined with client id {}", client_id);
                 players.players.insert(*client_id, PlayerData::default());
+                visualizer.add_client(*client_id);
             }
             ServerEvent::ClientDisconnected { client_id, reason } => {
                 println!(
                     "Player with client id {} left with reason \"{}\"",
                     client_id, reason
                 );
+                visualizer.remove_client(*client_id);
                 match state.get() {
                     GameState::InGame => {
                         server.broadcast_message(
@@ -140,62 +154,6 @@ fn receive_server_events(
     }
 }
 
-fn receive_client_messages_in_game(
-    mut server: ResMut<RenetServer>,
-    lobby: Res<Lobby>,
-    mut query: Query<(&mut DirectionVector, &mut Heavy), With<Ball>>,
-) {
-    for client_id in server.clients_id() {
-        while let Some(message) = server.receive_message(client_id, ClientChannel::Input) {
-            // TODO deal with these unwraps
-            let input: PlayerInput = bincode::deserialize(&message).unwrap();
-            let (mut direction, _) = query
-                .get_mut(lobby.players.get(&client_id).unwrap().entity.unwrap())
-                .unwrap();
-            *direction = DirectionVector::from(input);
-        }
-        while let Some(message) = server.receive_message(client_id, ClientChannel::Command) {
-            // TODO deal with these unwraps
-            let player_command: PlayerCommand = bincode::deserialize(&message).unwrap();
-            match player_command {
-                PlayerCommand::Heavy(heaviness) => {
-                    let (_, mut heavy) = query
-                        .get_mut(lobby.players.get(&client_id).unwrap().entity.unwrap())
-                        .unwrap();
-                    heavy.heaviness = heaviness;
-                    let message = bincode::serialize(&ServerMessage::PlayerHeavinessChange {
-                        player_id: client_id,
-                        heaviness,
-                    })
-                    .unwrap();
-                    server.broadcast_message(ServerChannel::ServerMessages, message);
-                }
-            };
-        }
-    }
-}
-
-fn send_clients_positions_in_game(
-    mut server: ResMut<RenetServer>,
-    query: Query<&Transform, With<Ball>>,
-    lobby: Res<Lobby>,
-) {
-    let mut networked_entities = NetworkedEntities::default();
-    for (id, data) in lobby.players.iter() {
-        // TODO unwraps
-        let entity = data.entity.unwrap();
-        let translation = query.get(entity).unwrap().translation;
-        networked_entities
-            .translations
-            .insert(*id, (translation.x, translation.y));
-    }
-
-    // TODO unwrap
-    let message = bincode::serialize(&networked_entities).unwrap();
-
-    server.broadcast_message(ServerChannel::NetworkedEntities, message);
-}
-
 fn start_lobby(mut server: ResMut<RenetServer>) {
     // TODO check if this unwrap is safe
     let message = bincode::serialize(&ServerMessage::EnterLobby).unwrap();
@@ -209,7 +167,7 @@ fn start_game(mut server: ResMut<RenetServer>, lobby: Res<Lobby>) {
     })
     .unwrap();
     server.broadcast_message(ServerChannel::ServerMessages, message);
-    println!("Starting game");
+    println!("Starting game...");
 }
 
 fn stop(mut exit: EventWriter<AppExit>, mut server: ResMut<RenetServer>) {
@@ -236,4 +194,13 @@ fn check_player_count(
             }
         }
     }
+}
+
+fn update_visualizer_system(
+    mut egui_contexts: EguiContexts,
+    mut visualizer: ResMut<RenetServerVisualizer<200>>,
+    server: Res<RenetServer>,
+) {
+    visualizer.update(&server);
+    visualizer.show_window(egui_contexts.ctx_mut());
 }
