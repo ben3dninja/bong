@@ -17,6 +17,12 @@ use serde::{Deserialize, Serialize};
 use server::channel::ServerChannel;
 pub use server::ServerPlugin;
 
+pub const PPM: f32 = 100.;
+pub const FIXED_DT: f32 = 0.02;
+
+pub const PHYSICS_DT: f32 = 1. * FIXED_DT;
+pub const SUBSTEPS: usize = 1;
+
 pub const BALL_RADIUS: f32 = 20.;
 pub const HEAVINESS_DURATION: Duration = Duration::new(5, 0);
 
@@ -31,6 +37,14 @@ pub enum GameState {
     InGame,
 }
 
+#[derive(Debug, PartialEq, Eq, Resource)]
+pub enum ApplicationSide {
+    Server,
+    Client,
+}
+
+/// The `Lobby` stores the set of players identified by a unique `u64`
+/// and their respective entities and initial data
 #[derive(Clone, Debug, Default, Serialize, Deserialize, Resource)]
 pub struct Lobby {
     players: HashMap<u64, PlayerData>,
@@ -42,13 +56,7 @@ pub struct PlayerData {
     entity: Option<Entity>,
 }
 
-#[derive(Debug, Resource, Eq, PartialEq)]
-pub enum ApplicationSide {
-    Server,
-    Client,
-}
-
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Copy, Clone, Component, Debug, Default, Serialize, Deserialize)]
 pub struct PlayerInput {
     direction: Vec2,
 }
@@ -62,21 +70,34 @@ impl From<PlayerInput> for DirectionVector {
     }
 }
 
+impl From<Vec2> for DirectionVector {
+    fn from(value: Vec2) -> Self {
+        DirectionVector(value.normalize_or_zero())
+    }
+}
+
 impl From<DirectionVector> for Vec2 {
     fn from(value: DirectionVector) -> Self {
         value.0
     }
 }
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub enum PlayerCommand {
-    Heavy(bool),
-}
-
 #[derive(Component, Debug, Default)]
 pub struct Heavy {
     pub heaviness: bool,
     pub heavy_timer: Stopwatch,
+}
+
+#[derive(Event)]
+pub struct InputReceivedEvent {
+    origin: u64,
+    input: PlayerInput,
+}
+
+#[derive(Event)]
+pub struct HeavinessReceivedEvent {
+    origin: u64,
+    heaviness: bool,
 }
 
 pub fn connection_config() -> ConnectionConfig {
@@ -87,7 +108,14 @@ pub fn connection_config() -> ConnectionConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct NetworkedEntities {
-    pub translations: HashMap<u64, (f32, f32)>,
-}
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+struct Receiving;
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+struct Processing;
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+struct Sending;
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+struct Displaying;

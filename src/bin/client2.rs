@@ -6,7 +6,7 @@ fn main() {
         .add_plugins(ClientPlugin {
             server_addr: "127.0.0.1:5000".parse().unwrap(),
             protocol_id: 1,
-            socket_addr: "127.0.0.1:0".parse().unwrap(),
+            socket_addr: "127.0.0.1:1".parse().unwrap(),
         })
         .run();
 }
