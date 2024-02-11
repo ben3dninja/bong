@@ -38,12 +38,12 @@ impl Plugin for BallsPlugin {
                 FixedUpdate,
                 (move_balls, jump)
                     .in_set(Processing)
-                    .after(chose_direction)
+                    .after(choose_direction)
                     .run_if(in_state(GameState::InGame)),
             )
             .add_systems(
                 FixedUpdate,
-                chose_direction
+                choose_direction
                     .in_set(Processing)
                     .run_if(in_state(GameState::InGame)),
             )
@@ -66,7 +66,7 @@ pub(super) fn spawn_balls(mut commands: Commands, mut lobby: ResMut<Lobby>) {
                 Heavy::default(),
                 TransformBundle::from_transform(Transform::from_translation(
                     data.spawning_location,
-                )), // TODO fix unwraping
+                )),
                 DirectionVector::default(),
                 RigidBody::Dynamic,
                 LockedAxes::ROTATION_LOCKED,
@@ -93,7 +93,7 @@ pub(super) fn despawn_balls(mut commands: Commands, balls: Query<Entity, With<Ba
     }
 }
 
-fn chose_direction(
+fn choose_direction(
     mut query: Query<&mut DirectionVector, With<Ball>>,
     lobby: Res<Lobby>,
     mut event_reader: EventReader<InputReceivedEvent>,
