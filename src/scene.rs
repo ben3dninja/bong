@@ -25,7 +25,7 @@ pub fn spawn_scene(mut commands: Commands) {
             combine_rule: CoefficientCombineRule::Min,
         },
         Restitution {
-            coefficient: 1.,
+            coefficient: 0.99,
             combine_rule: CoefficientCombineRule::Max,
         },
     ));
