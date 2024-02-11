@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::{prelude::*, time::Stopwatch};
 use bevy_rapier2d::prelude::*;
 
-use crate::{Heavy, Processing, HEAVINESS_DURATION};
+use crate::{HeavinessReceivedEvent, Heavy, Lobby, Processing, HEAVINESS_DURATION};
 
 pub const HEAVINESS_FACTOR: f32 = 0.1;
 
@@ -13,8 +13,25 @@ impl Plugin for HeavyPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             FixedUpdate,
-            (tick_timers, update_mass).in_set(Processing).chain(),
+            (update_heavy, tick_timers, update_mass)
+                .in_set(Processing)
+                .chain(),
         );
+    }
+}
+
+fn update_heavy(
+    mut query: Query<&mut Heavy>,
+    lobby: Res<Lobby>,
+    mut event_reader: EventReader<HeavinessReceivedEvent>,
+) {
+    for HeavinessReceivedEvent { origin, heaviness } in event_reader.iter() {
+        // TODO : unwraps
+        dbg!("Heaviness received for entity", origin);
+        let mut heavy = query
+            .get_mut(lobby.players.get(origin).unwrap().entity.unwrap())
+            .unwrap();
+        heavy.heaviness = *heaviness;
     }
 }
 
